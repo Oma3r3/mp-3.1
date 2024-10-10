@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-commerce Frontend</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        form, div { margin-bottom: 20px; }
+        input, button { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>E-commerce Application</h1>
+    
+    <form id="addProductForm">
+        <h2>Add New Product</h2>
+        <input type="text" id="name" placeholder="Product Name" required><br>
+        <input type="number" id="price" placeholder="Price" step="0.01" required><br>
+        <input type="text" id="description" placeholder="Description" required><br>
+        <input type="number" id="inventory" placeholder="Inventory" required><br>
+        <button type="submit">Add Product</button>
+    </form>
+
+    <div id="productList">
+        <h2>Product List</h2>
+        <ul id="products"></ul>
+    </div>
+
+    <form id="createOrderForm">
+        <h2>Create Order</h2>
+        <div id="orderProducts"></div>
+        <button type="submit">Place Order</button>
+    </form>
+
+    <div id="orderList">
+        <h2>Order List</h2>
+        <ul id="orders"></ul>
+    </div>
+
+    <script>
+        const PRODUCT_SERVICE_URL = 'http://localhost:3000';
+        const ORDER_SERVICE_URL = 'http://localhost:3001';
+
+        // const PRODUCT_SERVICE_URL = 'http://127.0.0.1:43786';
+        // const ORDER_SERVICE_URL = 'http://127.0.0.1:44057';
+
+
+        async function addProduct(event) {
+            event.preventDefault();
+            const product = {
+                name: document.getElementById('name').value,
+                price: parseFloat(document.getElementById('price').value),
+                description: document.getElementById('description').value,
+                inventory: parseInt(document.getElementById('inventory').value)
+            };
+
+            try {
+                const response = await fetch(`${PRODUCT_SERVICE_URL}/products`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(product)
+                });
+                if (!response.ok) throw new Error('Failed to add product');
+                document.getElementById('addProductForm').reset();
+                fetchProducts();
+            } catch (error) {
+                console.error('Error adding product:', error);
+            }
+        }
+
+        async function fetchProducts() {
+            try {
+                const response = await fetch(`${PRODUCT_SERVICE_URL}/products`);
+                if (!response.ok) throw new Error('Failed to fetch products');
+                const products = await response.json();
+                displayProducts(products);
+                updateOrderForm(products);
+            } catch (error) {
+                console.error('Error fetching products:', error);
+            }
+        }
+
+        function displayProducts(products) {
+            const productList = document.getElementById('products');
+            productList.innerHTML = '';
+            products.forEach(product => {
+                const li = document.createElement('li');
+                li.textContent = `${product.name} - $${product.price.toFixed(2)} - Inventory: ${product.inventory}`;
+                productList.appendChild(li);
+            });
+        }
+
+        function updateOrderForm(products) {
+            const orderProducts = document.getElementById('orderProducts');
+            orderProducts.innerHTML = '';
+            products.forEach(product => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <input type="checkbox" id="product_${product._id}" name="products" value="${product._id}">
+                    <label for="product_${product._id}">${product.name} - $${product.price.toFixed(2)}</label>
+                    <input type="number" id="quantity_${product._id}" min="1" max="${product.inventory}" value="1">
+                `;
+                orderProducts.appendChild(div);
+            });
+        }
+
+        async function createOrder(event) {
+            event.preventDefault();
+            const products = Array.from(document.querySelectorAll('input[name="products"]:checked')).map(input => ({
+                productId: input.value,
+                quantity: parseInt(document.getElementById(`quantity_${input.value}`).value)
+            }));
+
+            try {
+                const response = await fetch(`${ORDER_SERVICE_URL}/orders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ products })
+                });
+                if (!response.ok) throw new Error('Failed to create order');
+                fetchProducts();
+                fetchOrders();
+            } catch (error) {
+                console.error('Error creating order:', error);
+            }
+        }
+
+        async function fetchOrders() {
+            try {
+                const response = await fetch(`${ORDER_SERVICE_URL}/orders`);
+                if (!response.ok) throw new Error('Failed to fetch orders');
+                const orders = await response.json();
+                displayOrders(orders);
+            } catch (error) {
+                console.error('Error fetching orders:', error);
+            }
+        }
+
+        function displayOrders(orders) {
+            const orderList = document.getElementById('orders');
+            orderList.innerHTML = '';
+            orders.forEach(order => {
+                const li = document.createElement('li');
+                li.textContent = `Order ID: ${order._id} - Total: $${order.totalAmount.toFixed(2)} - Status: ${order.status}`;
+                orderList.appendChild(li);
+            });
+        }
+
+        document.getElementById('addProductForm').addEventListener('submit', addProduct);
+        document.getElementById('createOrderForm').addEventListener('submit', createOrder);
+        fetchProducts();
+        fetchOrders();
+    </script>
+</body>
+</html>
